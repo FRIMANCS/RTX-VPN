@@ -27,30 +27,48 @@ uninstall() {
     if [ -d "/opt/rtxvpn_v2/tunnel" ]; then
         while true; do
             read -p "This will remove ${CYAN}RTX-VPN v2 (Tunnel)${NC} and its associated files. Are you sure? (y/n): " confirm
-            if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
+            if [[ "$confirm" =~ ^[Yy]$ ]]; then
                 echo "Uninstalling RTX-VPN v2 (Tunnel)..."
                 rm -rf "/opt/rtxvpn_v2/tunnel"
 				
 				systemctl stop dnsmasq
 				systemctl disable dnsmasq
-				
-                apt remove dnsmasq -y
-				
-                sed -i '/200 rtx_table/d' /etc/iproute2/rt_tables
-				ip link set dev rtx down
-				ip tuntap del mode tun dev rtx
-				ip link set dev tap_softether down
-				ip addr del 198.19.0.1/24 dev tap_softether
-				ip route del 198.19.0.0/24 dev rtx table rtx_table
-				ip route del default dev rtx table rtx_table
-				ip rule del from 198.19.0.0/24 table rtx_table priority 10
-				ip rule del to 8.8.8.8 table main priority 11
-				ip rule del to 8.8.4.4 table main priority 12
-				
-				iptables -D FORWARD -i tap_softether -o rtx -j ACCEPT
-				iptables -D FORWARD -i rtx -o tap_softether -m state --state ESTABLISHED,RELATED -j ACCEPT
-				netfilter-persistent save
-				
+				apt remove dnsmasq -y
+
+                # 🔹 دریافت اطلاعات از کاربر
+                read -p "Enter WireGuard interface (e.g., wg0): " WG_IFACE
+                read -p "Enter the IP range used in your tunnel (e.g., 192.192.192.0/24): " TUNNEL_IP_RANGE
+
+                # 🔹 پاکسازی کامل قبل از راه‌اندازی
+                sysctl -w net.ipv4.ip_forward=1
+                echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
+
+                ip link set dev rtx down 2>/dev/null
+                ip tuntap del mode tun dev rtx 2>/dev/null
+
+                ip rule del from $TUNNEL_IP_RANGE table rtx_table 2>/dev/null
+                ip route flush table rtx_table 2>/dev/null
+
+                iptables -D FORWARD -i $WG_IFACE -o rtx -j ACCEPT 2>/dev/null
+                iptables -D FORWARD -i rtx -o $WG_IFACE -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null
+                iptables -t nat -D POSTROUTING -s $TUNNEL_IP_RANGE -o rtx -j MASQUERADE 2>/dev/null
+
+                grep -q "100 rtx_table" /etc/iproute2/rt_tables || echo "100 rtx_table" >> /etc/iproute2/rt_tables
+
+                ip tuntap add mode tun dev rtx
+                ip link set dev rtx up
+                ip route add default dev rtx table rtx_table
+                ip route add $TUNNEL_IP_RANGE dev $WG_IFACE table rtx_table
+
+                ip rule add from $TUNNEL_IP_RANGE table rtx_table priority 100
+
+                iptables -A FORWARD -i $WG_IFACE -o rtx -j ACCEPT
+                iptables -A FORWARD -i rtx -o $WG_IFACE -m state --state RELATED,ESTABLISHED -j ACCEPT
+                iptables -t nat -A POSTROUTING -s $TUNNEL_IP_RANGE -o rtx -j MASQUERADE
+
+                echo "✅ همه چیز پاک شد و ترافیک $WG_IFACE اکنون از تونل RTX عبور می‌کند."
+                # 🔹 پایان کد شما
+
                 if [ -f "/etc/systemd/system/rtxvpn.service" ]; then
                     systemctl stop rtxvpn.service
                     systemctl disable rtxvpn.service
@@ -62,7 +80,7 @@ uninstall() {
 
                 echo "RTX-VPN v2 (Tunnel) has been ${GREEN}removed${NC}"
                 break
-            elif [ "$confirm" = "n" ] || [ "$confirm" = "N" ]; then
+            elif [[ "$confirm" =~ ^[Nn]$ ]]; then
                 echo "Uninstallation of RTX-VPN v2 (Tunnel) ${RED}canceled${NC}"
                 break
             else
@@ -71,15 +89,14 @@ uninstall() {
         done
     fi
 
-    # Check and remove the edge directory
+    # حذف Edge (بدون تغییر)
     if [ -d "/opt/rtxvpn_v2/edge" ]; then
         while true; do
             read -p "This will remove ${CYAN}RTX-VPN v2 (Edge)${NC} and its associated files. Are you sure? (y/n): " confirm
-            if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
+            if [[ "$confirm" =~ ^[Yy]$ ]]; then
                 echo "Uninstalling RTX-VPN v2 (Edge)..."
                 rm -rf "/opt/rtxvpn_v2/edge"
                 
-                # Remove RTX-VPN service
                 if [ -f "/etc/systemd/system/rtxvpn.service" ]; then
                     systemctl stop rtxvpn.service
                     systemctl disable rtxvpn.service
@@ -91,7 +108,7 @@ uninstall() {
                 
                 echo "RTX-VPN v2 (Edge) has been ${GREEN}removed${NC}"
                 break
-            elif [ "$confirm" = "n" ] || [ "$confirm" = "N" ]; then
+            elif [[ "$confirm" =~ ^[Nn]$ ]]; then
                 echo "Uninstallation of RTX-VPN v2 (Edge) ${RED}canceled${NC}"
                 break
             else
@@ -216,8 +233,43 @@ EOF
 }
 
 tunnel_setup(){
-	echo "200 rtx_table" >> /etc/iproute2/rt_tables
-	cat <<EOF > /etc/systemd/system/rtxvpn.service
+    # 🔹 دریافت اطلاعات از کاربر
+    read -p "Enter WireGuard interface (e.g., wg0): " WG_IFACE
+    read -p "Enter the IP range used in your tunnel (e.g., 192.192.192.0/24): " TUNNEL_IP_RANGE
+
+    # 🔹 فعال‌سازی IP forwarding
+    sysctl -w net.ipv4.ip_forward=1
+    grep -q "net.ipv4.ip_forward=1" /etc/sysctl.conf || echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
+
+    # 🔹 حذف رابط‌های قدیمی و جدول‌های قدیمی
+    ip link set dev rtx down 2>/dev/null
+    ip tuntap del mode tun dev rtx 2>/dev/null
+
+    # حذف قوانین ip rule قدیمی
+    ip rule del from $TUNNEL_IP_RANGE table rtx_table 2>/dev/null
+
+    # حذف مسیرهای قدیمی
+    ip route flush table rtx_table 2>/dev/null
+
+    # 🔹 ایجاد جدول مسیریابی جدید
+    grep -q "100 rtx_table" /etc/iproute2/rt_tables || echo "100 rtx_table" >> /etc/iproute2/rt_tables
+
+    # 🔹 ایجاد رابط جدید و اضافه کردن مسیرها
+    ip tuntap add mode tun dev rtx
+    ip link set dev rtx up
+    ip route add default dev rtx table rtx_table
+    ip route add $TUNNEL_IP_RANGE dev $WG_IFACE table rtx_table
+
+    # 🔹 اضافه کردن قانون استفاده از جدول rtx_table
+    ip rule add from $TUNNEL_IP_RANGE table rtx_table priority 100
+
+    # 🔹 تنظیم iptables برای NAT و فورواردینگ
+    iptables -A FORWARD -i $WG_IFACE -o rtx -j ACCEPT
+    iptables -A FORWARD -i rtx -o $WG_IFACE -m state --state RELATED,ESTABLISHED -j ACCEPT
+    iptables -t nat -A POSTROUTING -s $TUNNEL_IP_RANGE -o rtx -j MASQUERADE
+
+    # 🔹 ایجاد سرویس systemd برای RTX-VPN
+    cat <<EOF > /etc/systemd/system/rtxvpn.service
 [Unit]
 Description=RTX-VPN Tunnel Service
 After=network.target
@@ -225,7 +277,7 @@ After=network.target
 [Service]
 Type=simple
 ExecStart=/usr/bin/python3 /opt/rtxvpn_v2/tunnel/tunnel.py
-ExecStop=/bin/kill -SIGINT $MAINPID
+ExecStop=/bin/kill -SIGINT \$MAINPID
 Restart=on-failure
 User=root
 Group=root
@@ -235,16 +287,11 @@ PIDFile=/var/run/vpn-service.pid
 [Install]
 WantedBy=multi-user.target
 EOF
-	systemctl enable rtxvpn.service
-	systemctl start rtxvpn.service
-	
-	echo 1 > /proc/sys/net/ipv4/ip_forward
-	iptables -A FORWARD -i tap_softether -o rtx -j ACCEPT
-	iptables -A FORWARD -i rtx -o tap_softether -m state --state ESTABLISHED,RELATED -j ACCEPT
 
-	echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
-	sysctl -p
-	apt install iptables-persistent -y
+    systemctl enable rtxvpn.service
+    systemctl start rtxvpn.service
+
+    echo "✅ Tunnel installed! Traffic from $WG_IFACE will now pass through the RTX tunnel."
 }
 
 edge_setup(){
