@@ -1,8 +1,6 @@
 
 # L2TP/OpenVPN/SSTP Server with Rathole + Tun2socks + Xray + Tunnel + SoftEther
 # RTX-VPN = (Rathole-tun2socks-Xray) VPN
-![App Screenshot](https://raw.githubusercontent.com/Sir-MmD/RTX-VPN/refs/heads/v2/menu.png)
-
 
 ## Installation
 ```bash
