@@ -81,26 +81,22 @@ download_edge_files(){
 		x86_64)
 			wget -P /opt/rtxvpn_v2/edge https://github.com/FRIMANCS/RTX-VPN/releases/download/v0.5.0/rathole-x86_64-unknown-linux-gnu.zip
 			wget -P /opt/rtxvpn_v2/edge https://github.com/FRIMANCS/RTX-VPN/releases/download/v25.2.21/Xray-linux-64.zip
-			
 			unzip /opt/rtxvpn_v2/edge/rathole-x86_64-unknown-linux-gnu.zip -d /opt/rtxvpn_v2/edge
 			unzip /opt/rtxvpn_v2/edge/Xray-linux-64.zip -d /opt/rtxvpn_v2/edge
-			
 			wget -P /opt/rtxvpn_v2/edge/ https://raw.githubusercontent.com/FRIMANCS/RTX-VPN/main/configs/edge.json
 			wget -P /opt/rtxvpn_v2/edge/ https://raw.githubusercontent.com/FRIMANCS/RTX-VPN/main/configs/edge.toml
 			wget -P /opt/rtxvpn_v2/edge/ https://raw.githubusercontent.com/FRIMANCS/RTX-VPN/main/configs/edge.py
-			chmod -R +x /opt/rtxvpn_v2/edge/ 
+			chmod -R +x /opt/rtxvpn_v2/edge/
 			;;
 		aarch64)
 			wget -P /opt/rtxvpn_v2/edge/ https://github.com/FRIMANCS/RTX-VPN/releases/download/v0.5.0/rathole-aarch64-unknown-linux-musl.zip
 			wget -P /opt/rtxvpn_v2/edge/ https://github.com/FRIMANCS/RTX-VPN/releases/download/v25.2.21/Xray-linux-arm64-v8a.zip
-			
 			unzip /opt/rtxvpn_v2/edge/rathole-aarch64-unknown-linux-musl.zip -d /opt/rtxvpn_v2/edge/
 			unzip /opt/rtxvpn_v2/edge/Xray-linux-arm64-v8a.zip -d /opt/rtxvpn_v2/edge/
-			
 			wget -P /opt/rtxvpn_v2/edge/ https://raw.githubusercontent.com/FRIMANCS/RTX-VPN/main/configs/edge.json
 			wget -P /opt/rtxvpn_v2/edge/ https://raw.githubusercontent.com/FRIMANCS/RTX-VPN/main/configs/edge.toml
 			wget -P /opt/rtxvpn_v2/edge/ https://raw.githubusercontent.com/FRIMANCS/RTX-VPN/main/configs/edge.py
-			chmod -R +x /opt/rtxvpn_v2/edge/ 
+			chmod -R +x /opt/rtxvpn_v2/edge/
 			;;
 		*)
 			echo "${RED}Unsupported CPU architecture: $CPU_ARCH${NC}"
@@ -120,12 +116,11 @@ download_tunnel_files() {
 			wget -P /opt/rtxvpn_v2/tunnel/ https://github.com/FRIMANCS/RTX-VPN/releases/download/v0.5.0/rathole-x86_64-unknown-linux-gnu.zip
 			wget -P /opt/rtxvpn_v2/tunnel/ https://github.com/FRIMANCS/RTX-VPN/releases/download/v2.5.2/tun2socks-linux-amd64.zip
 			wget -P /opt/rtxvpn_v2/tunnel/ https://github.com/FRIMANCS/RTX-VPN/releases/download/v25.2.21/Xray-linux-64.zip
-			
 			unzip /opt/rtxvpn_v2/tunnel/rathole-x86_64-unknown-linux-gnu.zip -d /opt/rtxvpn_v2/tunnel/
 			unzip /opt/rtxvpn_v2/tunnel/tun2socks-linux-amd64.zip -d /opt/rtxvpn_v2/tunnel/
 			unzip /opt/rtxvpn_v2/tunnel/Xray-linux-64.zip -d /opt/rtxvpn_v2/tunnel/
 			mv /opt/rtxvpn_v2/tunnel/tun2socks-linux-amd64 /opt/rtxvpn_v2/tunnel/tun2socks
-			chmod -R +x /opt/rtxvpn_v2/tunnel/ 
+			chmod -R +x /opt/rtxvpn_v2/tunnel/
 			wget -P /opt/rtxvpn_v2/tunnel/ https://raw.githubusercontent.com/FRIMANCS/RTX-VPN/main/configs/tunnel.json
 			wget -P /opt/rtxvpn_v2/tunnel/ https://raw.githubusercontent.com/FRIMANCS/RTX-VPN/main/configs/tunnel.toml
 			wget -P /opt/rtxvpn_v2/tunnel/ https://raw.githubusercontent.com/FRIMANCS/RTX-VPN/main/configs/tunnel.py
@@ -134,7 +129,6 @@ download_tunnel_files() {
 			wget -P /opt/rtxvpn_v2/tunnel/ https://github.com/FRIMANCS/RTX-VPN/releases/download/v0.5.0/rathole-aarch64-unknown-linux-musl.zip
 			wget -P /opt/rtxvpn_v2/tunnel/ https://github.com/FRIMANCS/RTX-VPN/releases/download/v2.5.2/tun2socks-linux-arm64.zip
 			wget -P /opt/rtxvpn_v2/tunnel/ https://github.com/FRIMANCS/RTX-VPN/releases/download/v25.2.21/Xray-linux-arm64-v8a.zip
-			
 			unzip /opt/rtxvpn_v2/tunnel/rathole-aarch64-unknown-linux-musl.zip -d /opt/rtxvpn_v2/tunnel/
 			unzip /opt/rtxvpn_v2/tunnel/tun2socks-linux-arm64.zip -d /opt/rtxvpn_v2/tunnel/
 			unzip /opt/rtxvpn_v2/tunnel/Xray-linux-arm64-v8a.zip -d /opt/rtxvpn_v2/tunnel/
@@ -174,8 +168,6 @@ EOF
 	systemctl enable rtxvpn.service
 	systemctl start rtxvpn.service
 	echo 1 > /proc/sys/net/ipv4/ip_forward
-	iptables -A FORWARD -i rtx -o rtx -m state --state ESTABLISHED,RELATED -j ACCEPT
-	iptables -A FORWARD -i rtx -o rtx -j ACCEPT
 	echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
 	sysctl -p
 	apt install iptables-persistent -y
@@ -253,4 +245,4 @@ while true; do
             echo "Invalid option. Please enter 1, 2, or 3."
             ;;
     esac
-s done
+done
