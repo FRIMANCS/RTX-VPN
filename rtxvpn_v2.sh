@@ -24,64 +24,73 @@ install_check() {
 }
 
 uninstall() {
+    # پاکسازی Tunnel
     if [ -d "/opt/rtxvpn_v2/tunnel" ]; then
         while true; do
-            read -p "This will remove ${CYAN}RTX-VPN v2 (Tunnel)${NC} and its associated files. Are you sure? (y/n): " confirm
-            if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            echo ""
+            read -p "This will remove RTX-VPN v2 (Tunnel) and its associated files. Are you sure? (y/n): " confirm
+            if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
                 echo "Uninstalling RTX-VPN v2 (Tunnel)..."
                 rm -rf "/opt/rtxvpn_v2/tunnel"
-				
-				systemctl stop dnsmasq
-				systemctl disable dnsmasq
-				apt remove dnsmasq -y
+                
+                systemctl stop dnsmasq
+                systemctl disable dnsmasq
+                apt remove dnsmasq -y
 
                 # 🔹 دریافت اطلاعات از کاربر
                 read -p "Enter WireGuard interface (e.g., wg0): " WG_IFACE
                 read -p "Enter the IP range used in your tunnel (e.g., 192.192.192.0/24): " TUNNEL_IP_RANGE
 
-                # 🔹 پاکسازی کامل قبل از راه‌اندازی
+                # 🔹 فعال‌سازی IP forwarding
                 sysctl -w net.ipv4.ip_forward=1
-                echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
+                grep -q "net.ipv4.ip_forward=1" /etc/sysctl.conf || echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
 
+                # 🔹 حذف رابط‌های قدیمی و جدول‌های قدیمی
                 ip link set dev rtx down 2>/dev/null
                 ip tuntap del mode tun dev rtx 2>/dev/null
 
+                # حذف قوانین ip rule قدیمی
                 ip rule del from $TUNNEL_IP_RANGE table rtx_table 2>/dev/null
+
+                # حذف مسیرهای قدیمی
                 ip route flush table rtx_table 2>/dev/null
 
+                # 🔹 حذف iptables قدیمی
                 iptables -D FORWARD -i $WG_IFACE -o rtx -j ACCEPT 2>/dev/null
                 iptables -D FORWARD -i rtx -o $WG_IFACE -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null
                 iptables -t nat -D POSTROUTING -s $TUNNEL_IP_RANGE -o rtx -j MASQUERADE 2>/dev/null
 
+                # 🔹 ایجاد جدول جدید
                 grep -q "100 rtx_table" /etc/iproute2/rt_tables || echo "100 rtx_table" >> /etc/iproute2/rt_tables
 
+                # 🔹 ایجاد رابط جدید و مسیرها
                 ip tuntap add mode tun dev rtx
                 ip link set dev rtx up
                 ip route add default dev rtx table rtx_table
                 ip route add $TUNNEL_IP_RANGE dev $WG_IFACE table rtx_table
 
+                # 🔹 اضافه کردن قانون استفاده از جدول
                 ip rule add from $TUNNEL_IP_RANGE table rtx_table priority 100
 
+                # 🔹 تنظیم iptables دوباره
                 iptables -A FORWARD -i $WG_IFACE -o rtx -j ACCEPT
                 iptables -A FORWARD -i rtx -o $WG_IFACE -m state --state RELATED,ESTABLISHED -j ACCEPT
                 iptables -t nat -A POSTROUTING -s $TUNNEL_IP_RANGE -o rtx -j MASQUERADE
 
                 echo "✅ همه چیز پاک شد و ترافیک $WG_IFACE اکنون از تونل RTX عبور می‌کند."
-                # 🔹 پایان کد شما
 
+                # توقف و حذف سرویس RTX-VPN
                 if [ -f "/etc/systemd/system/rtxvpn.service" ]; then
                     systemctl stop rtxvpn.service
                     systemctl disable rtxvpn.service
                     rm -f /etc/systemd/system/rtxvpn.service
-                    echo "RTX-VPN service ${GREEN}removed${NC}"
-                else
-                    echo "RTX-VPN service ${RED}not found!${NC}"
+                    echo "RTX-VPN service removed"
                 fi
 
-                echo "RTX-VPN v2 (Tunnel) has been ${GREEN}removed${NC}"
+                echo "RTX-VPN v2 (Tunnel) has been removed"
                 break
-            elif [[ "$confirm" =~ ^[Nn]$ ]]; then
-                echo "Uninstallation of RTX-VPN v2 (Tunnel) ${RED}canceled${NC}"
+            elif [ "$confirm" = "n" ] || [ "$confirm" = "N" ]; then
+                echo "Uninstallation of RTX-VPN v2 (Tunnel) canceled"
                 break
             else
                 echo "Invalid input. Please enter 'y' for yes or 'n' for no."
@@ -89,11 +98,11 @@ uninstall() {
         done
     fi
 
-    # حذف Edge (بدون تغییر)
+    # پاکسازی Edge بدون تغییر
     if [ -d "/opt/rtxvpn_v2/edge" ]; then
         while true; do
-            read -p "This will remove ${CYAN}RTX-VPN v2 (Edge)${NC} and its associated files. Are you sure? (y/n): " confirm
-            if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            read -p "This will remove RTX-VPN v2 (Edge) and its associated files. Are you sure? (y/n): " confirm
+            if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
                 echo "Uninstalling RTX-VPN v2 (Edge)..."
                 rm -rf "/opt/rtxvpn_v2/edge"
                 
@@ -101,22 +110,20 @@ uninstall() {
                     systemctl stop rtxvpn.service
                     systemctl disable rtxvpn.service
                     rm -f /etc/systemd/system/rtxvpn.service
-                    echo "RTX-VPN service ${GREEN}removed${NC}"
-                else
-                    echo "RTX-VPN service ${RED}not found!${NC}"
+                    echo "RTX-VPN service removed"
                 fi
                 
-                echo "RTX-VPN v2 (Edge) has been ${GREEN}removed${NC}"
+                echo "RTX-VPN v2 (Edge) has been removed"
                 break
-            elif [[ "$confirm" =~ ^[Nn]$ ]]; then
-                echo "Uninstallation of RTX-VPN v2 (Edge) ${RED}canceled${NC}"
+            elif [ "$confirm" = "n" ] || [ "$confirm" = "N" ]; then
+                echo "Uninstallation of RTX-VPN v2 (Edge) canceled"
                 break
             else
                 echo "Invalid input. Please enter 'y' for yes or 'n' for no."
             fi
         done
     else
-        echo "RTX-VPN v2 is ${RED}not installed!${NC}"
+        echo "RTX-VPN v2 is not installed!"
     fi
 }
 
