@@ -1,5 +1,5 @@
 #!/bin/bash
-# RTX-VPN Tunnel Installer (Light Version) with Optional Edge
+# RTX-VPN Tunnel Installer with Edge and Auto UUID
 
 GREEN=$(tput setaf 2)
 RED=$(tput setaf 1)
@@ -35,7 +35,7 @@ uninstall() {
 }
 
 download_tunnel_files() {
-    apt update && apt install -y wget unzip python3 iptables iproute2
+    apt update && apt install -y wget unzip python3 iptables iproute2 curl
 
     mkdir -p /opt/rtxvpn_v2/tunnel
 
@@ -70,6 +70,18 @@ download_tunnel_files() {
     # Download configs
     wget -P /opt/rtxvpn_v2/tunnel/ https://raw.githubusercontent.com/Sir-MmD/RTX-VPN/v2/configs/tunnel.json
     wget -P /opt/rtxvpn_v2/tunnel/ https://raw.githubusercontent.com/Sir-MmD/RTX-VPN/v2/configs/tunnel.toml
+    wget -P /opt/rtxvpn_v2/tunnel/ https://raw.githubusercontent.com/Sir-MmD/RTX-VPN/v2/configs/edge.py
+    wget -P /opt/rtxvpn_v2/tunnel/ https://raw.githubusercontent.com/Sir-MmD/RTX-VPN/v2/configs/edge.json
+    wget -P /opt/rtxvpn_v2/tunnel/ https://raw.githubusercontent.com/Sir-MmD/RTX-VPN/v2/configs/edge.toml
+}
+
+generate_uuid() {
+    # Requires uuidgen
+    command -v uuidgen >/dev/null 2>&1 || apt install -y uuid-runtime
+    UUID=$(uuidgen)
+    echo "Generated UUID: $UUID"
+    sed -i "s/\"uuid\"/\"$UUID\"/g" /opt/rtxvpn_v2/tunnel/tunnel.json
+    sed -i "s/\"uuid\"/\"$UUID\"/g" /opt/rtxvpn_v2/tunnel/tunnel.toml
 }
 
 tunnel_setup() {
@@ -77,7 +89,7 @@ tunnel_setup() {
     TUN_INTERFACE=${TUN_INTERFACE:-rtx}
     read -p "Enter client IP range (CIDR) for VPN clients (e.g., 192.192.192.0/24): " CLIENT_RANGE
     read -p "Do you want to enable Edge (connect to remote server)? (y/n): " ENABLE_EDGE
-    ENABLE_EDGE=${ENABLE_EDGE,,}  # lowercase
+    ENABLE_EDGE=$(echo "$ENABLE_EDGE" | tr '[:upper:]' '[:lower:]')
 
     # Setup TUN interface
     ip link show $TUN_INTERFACE >/dev/null 2>&1 || ip tuntap add mode tun dev $TUN_INTERFACE
@@ -118,8 +130,10 @@ EOF
     systemctl enable rtxvpn.service
     systemctl start rtxvpn.service
 
+    generate_uuid
+
     if [[ "$ENABLE_EDGE" == "y" ]]; then
-        echo "${GOLD}Edge will be enabled. Configure edge.py manually for remote server.${NC}"
+        echo "${GOLD}Edge will be enabled. Make sure edge.py is configured for remote server.${NC}"
     fi
 
     echo "${GREEN}Tunnel setup complete!${NC}"
@@ -127,7 +141,7 @@ EOF
 
 root_check
 clear
-echo "${GREEN}RTX-VPN Tunnel Installer (Light Version)${NC}"
+echo "${GREEN}RTX-VPN Tunnel Installer with Edge and Auto UUID${NC}"
 echo ""
 echo "Choose an option:"
 echo "1. Install Tunnel"
